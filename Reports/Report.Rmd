@@ -1,0 +1,150 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Part 1
+
+## 1. Summary
+
+Depending on the severity, cancer or tumors can often be classified as either benign or malignant. This analysis aims to determine the effects that several factors, including a breast lesion's physical attributes have on a lesion's severity. I am also interested in assessing which factor has the strongest association with malignancy. The statistical methods utilized in our analysis includes but does not limit to: multiple imputation of missing values, exploratory data analysis (EDA), fitting of a logistic regression model and model assessment. My final findings suggest that there are significant relationships between the odds of developing a malignant breast lesion and BI-RADS score, its mass shape and mass margin, as well as patient age, which has the strongest association with malignancy.  
+
+## 2. Introduction
+
+Despite its low mortality rate, breast cancer is the most commonly diagnosed cancer in women in the United States. The most effective method for screening breast cancer is mammography, which involves taking an x-ray image of the breast. If further assessment is required on a suspicious lesion, breast biopsy would also be introduced but it is often an unpleasant process. Therefore, there has been a high demand in utilizing machine learning on mammography data to assist diagnosis. As previously mentioned, I attempt to investigate this possibility by exploring the relationships between lesion malignancy and common measurements such as patient age, mass shape and margin.  am particularly interested in the assumption that certain mass shape is expected to increase the odds of malignancy. In addition, I am also interested in quantifying the effect of mass density. These questions could be addressed by fitting and interpreting a logistic regression model. Last but not the least, I hope to identify most indicative predictor at determining the odds of a malignant lesion, which could be determined through the point estimates of predictor effects.
+
+## 3. Data
+
+The data I have used for this analysis came from a study conducted by Matthias Elter, R. Schulz-Wendtland and T. Wittenberg in 2007. And they have generously shared the original dataset with the UCI MAchine Learning Repository. This dataset consists of 961 observations and 6 attributes (1 response and 5 predictors). There are 445 positive cases and 516 negative cases, which is pretty balanced for a classification problem. The attribute detail is summarized below:
+
+* *BI-RADS*: BI-RADS assessment ranging from 1 (definitely benign) to 5(highly suggestive of malignancy) [categorical];
+
+* *Age*: patient age [continuous];
+
+* *Shape*: lesion mass shape, includes round, oval, lobular and irregular [categorical];
+
+* *Margin*: lesion mass margin, includes circumscribed, microlobulated, obscured, ill-defined and spiculated [categorical];
+
+* *Density*: lesion mass density, includes high, iso, low and fat-containing [categorical];
+
+* *Severity*: the response predictor that represents lesion severity, can be either benign or malignant [categorical].
+
+Based on the description above, each predictor is then cleaned by first converting them to the appropriate. This dataset also contains some missing values, which needs to be imputed through statistical approach. In addition, preliminary inspection of the data shows that the BI-RADS indicator contains 0 and 55, which are outside of its normal range (1 to 5). Further research indicates that 0 and 55 are used to represent incomplete assessment. Therefore, I decide to treat them as missing values as well. 
+
+### 3.1 Imputation
+
+
+
+We start EDA by visually inspecting the relationship that each predictor variable has with the response variable `log_uterus`. We use scatterplots for continuous predictors and box plots for categorical variables. Our observations are summarized below:
+
+* `weight_bi` vs. `log_uterus`: the median values and distributions of uterus weight are very different for the two weight groups, suggesting that we should control for this variable in our model.
+
+* `protocol` vs. `log_uterus`: the median values and distributions of uterus weight are around the same for the pair of `protocols` A,B and that of C,D respectively. However, C, D are distinctly higher than A,B. This makes intuitive sense since `protocols` A,B are used for immature rats. However, this also suggests that `protocol` carries same information as `weight_bi` as immature rats are inherently lighter in body weight. Therefore, we will not consider this main effect.
+
+* `EE` vs. `log_uterus`: the scatterplot exhibits a positive trend with increasing `EE` dosage, indicating that we should control for this variable in our model.
+
+* `ZM` vs. `log_uterus`: the scatterplot exhibits a negative trend with increasing `ZM` dosage, indicating that we should control for this variable in our model.
+
+* `lab` vs. `log_uterus`: the median values and distributions of uterus weights vary across labs, suggesting that we should control for this variable in our model. Note that since we are interested in assessing the varying dose response across labs, this variable will be used to construct random effects on the baseline intercept.
+
+* `group` vs. `log_uterus`: the median values and distributions of uterus weights vary across groups. However, closer examination at the sample distribution across different `group` and `EE`/`ZM` combinations shows that each group uses a unique `EM`/`ZM` dosage level. This means that `group` could carry redundant or duplicated information for the purpose of our analysis, because it has been captured by `EE` and `ZM` already. Therefore, we will not consider this main effect nor its interaction with other predictors.
+
+Following that, we explore the interactions terms. Since our primary interest resolves around estrogen effects, we will focus on interactions between different predictor and EE/ZM. These are summarized below:
+
+* `EE` vs. `log_uterus` by `protocol`: There are sufficient samples in each `EE` and `protocol` combination, suggesting a valid interaction. However, the trends across 4 protocols are all positive. We will therefore not consider this term using ANOVA test during model selection. 
+
+* `EE` vs. `log_uterus` by `lab`: There are missing values in 3 `EE` and `lab` combinations. Additionally, many combinations only have 6 observations, which are insufficient for exploring the effects of interaction. We will therefore not consider this term using ANOVA test during model selection.
+
+* `EE` vs. `log_uterus` by `weight_bi`: There are sufficient samples in each `EE` and `weight_bi` combination, suggesting a valid interaction. However, the trends across 2 weight groups are all positive. We will therefore not consider this term using ANOVA test during model selection.
+
+* `ZM` vs. `log_uterus` by `protocol`: There are sufficient samples in each `ZM` and `protocol` combination, suggesting a valid interaction. However, the trends across 4 protocols are all positive. We will therefore not consider this term using ANOVA test during model selection.
+
+* `ZM` vs. `log_uterus` by `lab`: There are many `ZM` and `lab` combinations that only have 6 observations, which are insufficient for exploring the effects of interaction. We will therefore not consider this term using ANOVA test during model selection.
+
+* `ZM` vs. `log_uterus` by `weight_bi`: There are sufficient samples in each `EE` and `weight_bi` combination, suggesting a valid interaction. However, the trends across 2 weight groups are all negative. We will therefore not consider this term using ANOVA test during model selection.
+
+As a summary of our EDA, we will include all main effects except for `protocol` and `group` in our further analysis. We will also not include any interaction terms in our model construction. 
+
+## 4. Model
+There are multiple steps involved in defining our final model. These steps are listed below:
+
+1. We first construct a null model using the main effects we deemed to keep in the previous section, which are `EE`, `ZM`, `weight_bi`, `lab`. To better align our model with the analysis objective, we decide to replace `lab` with the its random effects on the intercept, which is formulated as (1|lab). Additionally, to answer if protocols differ in detecting EE and ZM effects, we will also add their combined random effects on the slope within each protocol. This will be formulated as (EE + ZM -1 | protocol) in R. Note that the ‘-1’ is used to isolate the random effects of slope without creating a varying intercept effect by protocol, since `weight_bi` offers the same information as `protocol` and has already been included in our null model.
+
+2. We then assess our regression assumptions for our null model:
+
+	* **Linearity**: we don’t have continuous variables since `EE` and `ZM` are really discrete variables. Therefore, no linearity assessment is needed.
+	
+	* **Normality**: the points don’t exactly align with a 45 degree line and reflect the bimodal distribution we saw earlier. 
+	
+	* **Independence**: there are 2 clusters in our residual plots. We have attempted to minimize this by separating the original weight predictor to 2 groups (`weight_bi`). The persistence of clustering could attribute to other intrinsic clusters we are not controlling for. 
+	
+	* **Equal variance**: the spread looks equal overall.
+In summary, the assumptions are not completely fulfilled. However, as we will later explain, this model is the best we could fit utilizing the provided data. 
+
+3. Normally, this part of model selection involves building other models, using AIC/BIC selection criterion and ANOVA to test these models against our null model. However, this step could be skipped since our null model includes almost all main effects and our EDA showed no visually significant features including interactions. Nonetheless, we attempted ANOVA test on the interactions we explored during EDA. However, there are not enough sample in most interactions we explored earlier, which does not meet interaction requirements. Also, certain predictor carries duplicated information (`weight_bi` captures the sample information as` protocol`). Additionally, these models failed to converge during ANOVA test. Therefore, the null model is used as our final model. Note that the same reasons apply to the statement we made at the end of the previous step.
+
+### 4.1 Final model
+Our final model is illustrated using the formula below:
+$$
+\begin{aligned}
+log(uterus) = (\beta_0 + \gamma_{0[lab]}) + (\beta_{1} + \gamma_{1[protocol]})(EE_{i[protocol]} + ZM_{i[protocol]}) + \\
+\beta_2EE_i + \beta_3ZM_i + \beta_4weight\_bi_i + \epsilon_{i[lab][protocol]} \\
+i = 1,...,n \\
+\epsilon_{i[lab][protocol]}\sim N(0,\sigma^2) \\
+(\gamma_{0[lab]}, \gamma_{1[protocol]})\sim N_2(0, \Sigma) \\
+\Sigma = \left[\begin{array}
+{rr}
+\tau_{lab}^2 & \rho\tau_{lab}(\tau_{protocol.EE} + \tau_{protocol.ZM}) \\
+\rho\tau_{lab}(\tau_{protocol.EE} + \tau_{protocol.ZM}) & (\tau_{protocol.EE} + \tau_{protocol.ZM})^2 \\
+\end{array}\right]
+\end{aligned}
+$$
+
+And the model summary is shown below:
+
+![model summary.](./Team Project 2/model_summary.jpg){height=45%}\
+
+Our model’s baseline is an immature female rat that has not been given any EE nor ZM.  
+
+## 5. Conclusion
+In this section, we attempt to interpret our model and answer the questions we previously asked. The result shows that all predictors in our final model are significant at level 0.01. And the interpretations are listed below:
+
+* **fixed effects:**
+	* intercept: for any immature female rat without any exposures to EE nor ZM, the baseline uterus weight is 36.97 mg.
+	
+	* EE: for any immature female rat, a unit increase in EE dosage is expected to increase the uterus weight by 15.03%, while holding all other variables constant.
+	
+	* ZM: for any immature female rat, a unit increase in ZM dosage is expected to decrease the uterus weight by 43.45%, while holding all other variables constant.
+	
+	* weight_bi (mature): for any female rat, being mature is expected to increase the uterus weight by 263.28% than being immature, while holding all other variables constant.
+	
+* **random effects:**
+
+	* the estimated standard error 0.43 describes the overall unexplained within-lab variation.
+	
+	* the estimated $\tau_{lab}$= 0.18 describes the across-lab variation attributed to the random intercept (`lab`).
+	
+	* the estimated $\tau_{protocol.EE}$ = 0.015 describes the variations attributed to random slope (`EE`).
+	
+	* the estimated $\tau_{protocol.ZM}$ = 0.22 describes the variations attributed to random slope (`ZM`).
+
+According to our interpretations, uterus weight exhibits significant dose response to `EE` and `ZM`. More specifically, for any immature female, increase in `EE` and `ZM` dosages are expected to increase or decrease uterus weight, respectively. This finding validates the assumption that the uterotrophic bioassay can successfully identify estrogenic effects of `EE` and `ZM` (increasing dose response trend for `EE` and decreasing dose repose trend for `ZM`). 
+
+As suggested by our model summary as well as the dotplot, the dose response does vary across labs. More specifically, there is a across-lab standard deviation of 0.18, which confirms the varying response across labs. Several labs are considered outliers since their confidence interval (not taking random effects into consideration) does not cover baseline intercept: 
+
+* above baseline intercept: Chungkor, Citfranc, Exxon, Denmark, Sumitomo, Citijapa, Mitsubis.
+	
+* below baseline intercept: KoreaPar, Huntingd, Basf, Poulenc.
+
+To determine if protocols differ in their sensitivity to detecting `EE` and `ZM` effects, we could look at the dotplot produced by the random slope of `EE`/`ZM`. Because EE intends to increase uterus weight and `ZM` decrease the weight, we identify the most efficacious protocol for each effect by finding the protocol furthest above and below the baseline respectively. And our dotplot suggests `protocol` B (immature female rats dosed by inject (3 days)) is the most efficacious at detecting both `EE` and `ZM`.
+
+There are several limitations to this analysis:
+
+* First of all, our sample size is not big enough. This was pointed out when we attempted to explore the interactions between some predictor (e.g. `EE` by `lab`).
+
+* Our data exhibited some clustering effects caused by the natural grouping of immature and mature rats, which is not ideal for linear regression analysis. A better approach would be to perform analysis on each group separately. 
+
+
+
+
+
