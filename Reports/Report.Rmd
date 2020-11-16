@@ -51,7 +51,7 @@ The data I have used for this analysis came from a study conducted by Matthias E
 
 * *Severity*: the response predictor that represents lesion severity, can be either benign or malignant.
 
-Based on the description above, each predictor is then cleaned by first converting them to the appropriate. This dataset also contains some missing values, which needs to be imputed through statistical approach. In addition, preliminary inspection of the data shows that the BI-RADS indicator contains 0 and 55, which are outside of its normal range (1 to 5). Further research indicates that 0 and 55 are used to represent incomplete assessment. Therefore, I decide to treat them as missing values as well. 
+Based on the description above, each predictor is then cleaned by first converting them to the appropriate. This dataset also contains some missing values, which needs to be imputed through statistical approach. 
 
 ### 3.1 Imputation
 
@@ -59,7 +59,7 @@ In data analysis, there are often different ways to deal with missing values. If
 
 ![Summary of Missing Values](./missing_values.png){height=20%}
 
-Figure 1. indicates that there are missing values in all predictor variables. More specifically, the predictor representing lesion mass density has the highest number of missing values (76 observations). To address this problem, I'm applying Multiple Imputation to generate 10 imputed copies of the original data. This is done to better estimate the uncertainty so both the within and between data variance could be taken into consideration. In addition, it's more flexible in modeling missing data based on their types. Concretely, it allows me to use Bayesian Linear Regression on continuous predictors, Logistic Regression on binary variables, Multinominal Logistic Regression on nominal categorical variables and Proportional Odds Model on ordinal categorical variables. Note that Bayesian Linear Regression is used instead of Predictive Mean Matching for continuous variable because I don't want the imputed values to take on existing values nor be bound by their ranges. After imputation, I use strip plot and density plot on continuous predictors to assess the imputation quality. In this case, patient age is the only continuous predictor, as illustrated below:
+Figure 1. indicates that there are missing values in all predictor variables. To address this problem, I'm applying Multiple Imputation to generate 10 imputed copies of the original data. This is done to better estimate the uncertainty so both the within and between data variance could be taken into consideration. In addition, it's more flexible in modeling missing data based on their types. Concretely, it allows me to use Bayesian Linear Regression on continuous predictors, Logistic Regression on binary variables, Multinominal Logistic Regression on nominal categorical variables and Proportional Odds Model on ordinal categorical variables. Note that Bayesian Linear Regression is used instead of Predictive Mean Matching for continuous variable because I don't want the imputed values to take on existing values nor be bound by their ranges. After imputation, I use strip plot and density plot on continuous predictors to assess the imputation quality. In this case, patient age is the only continuous predictor, as illustrated below:
 
 ![Strip Plot and Denstiy Plot of Patient Age](./imputation_assessment.png){height=20%}
 
@@ -73,7 +73,7 @@ For patient age, there is a disparity in median and distribution between 2 sever
 
 Following that, I explore the interaction between different predictors. I start off by looking at the interactions between patient age and other categorical predictors. As illustrated in the figure below, the trends are generally consistent across all levels and do not exhibit an interactions:
 
-![Interactions between Patient Age and Other Categorical Predictors.](./interactions.png){height=30%}
+![Interactions between Patient Age and Other Categorical Predictors.](./interactions.png){height=25%}
 
 To check if the interactions between the categorical predictors are meaningful, I inspect contingency tables first to check that there are enough samples in the combinations of various predictor levels. However, all tables include certain combinations where the sample size is 0. For instance, the contingency table for lesion density and BI-RADS is shown below, where there are no observations where the lesion density is high while the BI-RADS score is 6:
 
@@ -114,7 +114,7 @@ $$
 \log(\frac{\pi_i}{1 - \pi_i}) = \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i} + \beta_3 x_{3i}+ \beta_4 x_{4i};
 $$
 
-7. In the last step, I apply the formula above to all 10 copies of imputed data based on the Rubin combining rules. And the following model summary is obtained:
+7. In the last step, I apply the formula above to all 10 copies of imputed data based on the Rubin combining rules. Model summary is shown in the table below.
 
 \begin{table}[ht]
 \centering
